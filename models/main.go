@@ -57,6 +57,17 @@ func (user *User) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+func (post *Post) AfterCreate(tx *gorm.DB) error {
+	log.Println("Created Post Title : ", post.Title, "at id", post.ID)
+	return nil
+}
+func (post *Post) BeforeCreate(tx *gorm.DB) error {
+	if post.Title == "" || post.Content == "" {
+		return fmt.Errorf("invalid post")
+	}
+	return nil
+
+}
 func (user *User) BeforeSave(tx *gorm.DB) error {
 	h := sha256.Sum256([]byte(user.Password))
 	hashedPassword := hex.EncodeToString(h[:])
