@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
+// CreateUser creates a new user in the database.
 func CreateUser(DB *gorm.DB, user *models.User) error {
 	result := DB.Create(user)
 	if result.Error != nil {
@@ -14,14 +15,32 @@ func CreateUser(DB *gorm.DB, user *models.User) error {
 	}
 	return nil
 }
-func MyData(DB *gorm.DB, id uint) ([]models.User, error) {
-	var user []models.User
-	err := DB.Preload("Posts", nil).Preload("Tags", nil).Select("Name,Email").Where("id = ?", id).Find(&user)
+// MyData returns the user data for a given email and password.
+func MyData(DB *gorm.DB, email string, password string) (models.User, error) {
+	var user models.User
+	err := DB.Preload("Posts", nil).Preload("Tags", nil).Where("Email = ?", email, "Password = ?", password).Find(&user)
 	if err.Error != nil {
-		return nil, err.Error
+		return user, err.Error
+	}
+	if user.ID == 0 {
+		return models.User{}, fmt.Errorf("no user found")
 	}
 	return user, nil
 }
+// AboutMe returns the user data for a given user ID.
+func AboutMe(DB *gorm.DB, id uint) (models.User, error) {
+	var user models.User
+	err := DB.Preload("Posts", nil).Preload("Tags", nil).Where("ID = ?", id).Find(&user)
+	if err.Error != nil {
+		return user, err.Error
+	}
+	if user.ID == 0 {
+		return models.User{}, fmt.Errorf("no user found")
+	}
+	return user, nil
+}
+
+// ViewAllUsers returns all users in the database with their posts and tags preloaded.
 func ViewAllUsers(DB *gorm.DB) ([]models.User, error) {
 	var users []models.User
 	result := DB.Preload("Posts", nil).Preload("Tags", nil).Find(&users)
