@@ -18,7 +18,7 @@ func Server(db *gorm.DB) *fiber.App {
 	app := fiber.New()
 	api := app.Group("/rest/api/v1")
 	api.Use(limiter.New(limiter.Config{
-		Max:        20,
+		Max:        100,
 		Expiration: 30 * time.Second,
 		LimitReached: func(c fiber.Ctx) error {
 

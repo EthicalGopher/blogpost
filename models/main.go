@@ -6,41 +6,54 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
 
+// Base model to replace gorm.Model with snake_case JSON tags
+type Base struct {
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
 type User struct {
-	gorm.Model
-	Posts    []Post `gorm:"foreignKey:UserID;references:ID"`
-	Name     string `gorm:"size:40"`
-	Email    string
-	Password string
-	Tags     []Tag `gorm:"many2many:all_tags"`
+	Base
+	Posts    []Post `gorm:"foreignKey:UserID;references:ID" json:"posts"`
+	Name     string `gorm:"size:40" json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"-"`
+	Tags     []Tag  `gorm:"many2many:all_tags" json:"tags"`
 }
 
 type Post struct {
-	gorm.Model
-	Title    string `gorm:"size:255"`
-	Content  string
-	UserID   uint
-	Comments []Comment
+	Base
+	Title    string    `gorm:"size:255" json:"title"`
+	Content  string    `json:"content"`
+	UserID   uint      `json:"user_id"`
+	User     User      `gorm:"foreignKey:UserID" json:"author"`
+	Comments []Comment `json:"comments"`
 }
 
 type Category struct {
-	gorm.Model
-	PostID uint
-	Title  string `gorm:"size:255"`
+	Base
+	PostID uint   `json:"post_id"`
+	Title  string `gorm:"size:255" json:"title"`
 }
+
 type Comment struct {
-	gorm.Model
-	PostID uint
-	UserID uint
-	Text   string
+	Base
+	PostID uint   `json:"post_id"`
+	UserID uint   `json:"user_id"`
+	User   User   `gorm:"foreignKey:UserID" json:"user"`
+	Text   string `json:"text"`
 }
+
 type Tag struct {
-	gorm.Model
-	Name string
+	Base
+	Name string `json:"name"`
 }
 
 func (user *User) AfterCreate(tx *gorm.DB) error {
@@ -57,20 +70,24 @@ func (user *User) BeforeCreate(tx *gorm.DB) error {
 	}
 	return nil
 }
+
 func (post *Post) AfterCreate(tx *gorm.DB) error {
 	log.Println("Created Post Title : ", post.Title, "at id", post.ID)
 	return nil
 }
+
 func (post *Post) BeforeCreate(tx *gorm.DB) error {
 	if post.Title == "" || post.Content == "" {
 		return fmt.Errorf("invalid post")
 	}
 	return nil
-
 }
+
 func (user *User) BeforeSave(tx *gorm.DB) error {
-	h := sha256.Sum256([]byte(user.Password))
-	hashedPassword := hex.EncodeToString(h[:])
-	user.Password = hashedPassword
+	if user.Password != "" && len(user.Password) != 64 {
+		h := sha256.Sum256([]byte(user.Password))
+		hashedPassword := hex.EncodeToString(h[:])
+		user.Password = hashedPassword
+	}
 	return nil
 }

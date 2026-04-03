@@ -6,13 +6,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"strconv"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
 
 type AuthResponse struct {
-	UserID       uint   `json:"id"`
+	UserID       uint   `json:"user_id"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
@@ -27,41 +26,28 @@ type UserRequest struct {
 func (s *ServerDB) SignUp(c fiber.Ctx) error {
 	var user UserRequest
 	if err := c.Bind().Body(&user); err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 	u := models.User{Name: user.Name, Email: user.Email, Password: user.Password}
-	err := s.DB.Create(&u)
-	if err.Error != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+	if err := s.DB.Create(&u).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create user"})
 	}
 	return c.SendStatus(201)
-}
-
-// AllUsers returns all registered users.
-func (s *ServerDB) AllUsers(c fiber.Ctx) error {
-	var user []models.User
-	var err error
-	user, err = utils.ViewAllUsers(s.DB)
-	if err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
-	}
-	return c.Status(200).JSON(user)
 }
 
 // SignIn handles user authentication.
 func (s *ServerDB) SignIn(c fiber.Ctx) error {
 	var user UserRequest
 	if err := c.Bind().Body(&user); err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
 	}
 
 	h := sha256.Sum256([]byte(user.Password))
 	hashedPassword := hex.EncodeToString(h[:])
 
-	// Correctly query the user
 	var u models.User
 	if err := s.DB.Where("email = ? AND password = ?", user.Email, hashedPassword).First(&u).Error; err != nil {
-		return c.SendStatus(401)
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid credentials"})
 	}
 
 	accessToken, err := utils.GenerateAccessToken(u.ID, u.Email)
@@ -73,13 +59,6 @@ func (s *ServerDB) SignIn(c fiber.Ctx) error {
 	if err != nil {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
-
-	c.Cookie(&fiber.Cookie{
-		Name:     "access_token",
-		Value:    accessToken,
-		Expires:  time.Now().Add(15 * time.Minute),
-		HTTPOnly: true,
-	})
 
 	return c.Status(200).JSON(AuthResponse{
 		UserID:       u.ID,
@@ -113,7 +92,16 @@ func RefreshToken(c fiber.Ctx) error {
 	})
 }
 
-// AboutMe returns the profile of the currently logged-in user.
+// AllUsers, AboutMe... (rest remains similar but use snake_case JSON if needed)
+func (s *ServerDB) AllUsers(c fiber.Ctx) error {
+	var user []models.User
+	user, err := utils.ViewAllUsers(s.DB)
+	if err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	return c.Status(200).JSON(user)
+}
+
 func (s *ServerDB) AboutMe(c fiber.Ctx) error {
 	idVal := c.Params("id")
 	id, _ := strconv.Atoi(idVal)
@@ -123,7 +111,5 @@ func (s *ServerDB) AboutMe(c fiber.Ctx) error {
 			"error": "failed to fetch user",
 		})
 	}
-
 	return c.JSON(user)
-
 }
